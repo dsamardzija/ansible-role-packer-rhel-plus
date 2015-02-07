@@ -1,0 +1,169 @@
+---
+- name: Get the current kernel release.
+  command: uname -r
+  changed_when: false
+  register: kernel_release
+
+
+- name: Import EPEL, Remi and RPMForge GPG keys
+  rpm_key: "key={{ item }} state=present"
+  with_items:
+  - "https://fedoraproject.org/static/0608B895.txt"
+  - "http://rpms.famillecollet.com/RPM-GPG-KEY-remi"
+  - "http://apt.sw.be/RPM-GPG-KEY.dag.txt"
+
+- name: Install EPEL, Remi, RPMForge and Nginx repos
+  command: "rpm -Uvh --force {{ item.href }} creates={{ item.creates }}"
+  with_items:
+  - {
+    href: "http://download.fedoraproject.org/pub/epel/6/i386/epel-release-6-8.noarch.rpm",
+    creates: "/etc/yum.repos.d/epel.repo"
+  }
+  - {
+    href: "http://rpms.famillecollet.com/enterprise/remi-release-6.rpm",
+    creates: "/etc/yum.repos.d/remi.repo"
+  }
+  - {
+    href: "http://pkgs.repoforge.org/rpmforge-release/rpmforge-release-0.5.3-1.el6.rf.x86_64.rpm",
+    creates: "/etc/yum.repos.d/rpmforge.repo"
+  }
+  - {
+    href: "http://nginx.org/packages/centos/6/noarch/RPMS/nginx-release-centos-6-0.el6.ngx.noarch.rpm",
+    creates: "/etc/yum.repos.d/nginx.repo"
+  }
+
+- name: Manualy update EPEL repo until it's fixed
+  copy:
+    src: "{{ item.src }}"
+    dest: "{{ item.dest }}"
+    owner: root
+    group: root
+    mode: 644
+  with_items:
+  - {
+    src: "yum.repos.d/epel.repo",
+    dest: "/etc/yum.repos.d/epel.repo"
+  }
+
+- name: Remove unused packages
+  yum: name=httpd state=absent
+
+- name: Manually enable remi repo
+  ini_file: dest=/etc/yum.repos.d/remi.repo section=remi option=enabled value=1
+
+- name: Update ALL yum packages to latest
+  yum: pkg=* state=latest
+
+- name: Install Yum packages needed for project
+  yum: "pkg={{ item }} state=present"
+  with_items:
+  - openssh
+  - openvpn
+  - curl
+  - curl-devel
+  - gcc
+  - gcc-c++
+  - zip
+  - unzip
+  - mutt
+  - make
+  - libtool
+  - binutils
+  - openssl
+  - git
+  - gitflow
+  - memcached
+  - openssl-devel
+  - vim-common
+  - nodejs.x86_64
+  - npm
+  - ruby
+  - ruby-rdoc
+  - ruby-devel
+  - rubygems
+  - java-1.7.0-openjdk-devel
+  - re2c
+  - zeromq-devel
+  - zeromq
+  - php
+  - php-fpm
+  - php-common
+  - php-pecl-apc
+  - php-cli
+  - php-pear
+  - php-pdo
+  - php-mysqlnd
+  - php-pgsql
+  - php-pecl-mongo
+  - php-sqlite
+  - php-pecl-memcache
+  - php-pecl-memcached
+  - php-gd
+  - php-mbstring
+  - php-mcrypt
+  - php-xml
+  - php-pecl-geoip
+  - php-pecl-imagick
+  - php-devel
+  - pcre-devel
+  - php-pecl-xdebug
+  - mysql-server
+  - MySQL-python
+  - libselinux-python
+  - libsemanage-python
+
+- name: Ensure necessary packages are installed.
+  yum: "pkg={{ item }} state=installed"
+  with_items:
+    - wget
+    - perl
+    - cpp
+    - gcc
+    - make
+    - bzip2
+    - kernel-headers
+    - kernel-devel
+    - "kernel-devel-{{ kernel_release.stdout }}"
+    - libselinux-python
+
+
+# Vagrant SSH configuration.
+- name: Configure Vagrant .ssh directory.
+  file: path=/home/vagrant/.ssh state=directory owner=vagrant group=vagrant mode=700
+
+- name: Get Vagrant's public key.
+  get_url: >
+    url=https://github.com/mitchellh/vagrant/raw/master/keys/vagrant.pub
+    dest=/home/vagrant/.ssh/authorized_keys
+    owner=vagrant
+    group=vagrant
+    mode=600
+
+- name: Remove all ISOs in vagrant home directory.
+  shell: "rm /home/vagrant/*.iso"
+
+# Cleanup tasks.
+- name: Remove unneeded packages.
+  yum: "pkg={{ item }} state=absent"
+  with_items:
+    - cpp
+    - kernel-devel
+    - kernel-headers
+
+- name: Clean up yum.
+  command: yum clean all
+
+- name: Remove any remnants of VirtualBox ISOs.
+  shell: rm -rf VBoxGuestAdditions_*.iso VBoxGuestAdditions_*.iso.?
+
+- name: Remove RedHat interface persistence (step 1).
+  shell: rm -f /etc/udev/rules.d/70-persistent-net.rules
+
+- name: Remove RedHat interface persistence (step 2).
+  lineinfile: >
+    dest=/etc/sysconfig/network-scripts/ifcfg-eth0
+    regexp="{{ item }}"
+    state=absent
+  with_items:
+    - '^HWADDR'
+    - '^UUID'

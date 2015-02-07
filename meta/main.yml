@@ -1,0 +1,19 @@
+---
+dependencies: []
+
+galaxy_info:
+  author: dsamardzija
+  description: Additional tasks for bass RedHat/CentOS configuration for Packer.
+  company: "Little Genius Studio"
+  license: "license (BSD, MIT)"
+  min_ansible_version: 1.4
+  platforms:
+  - name: EL
+    versions:
+    - 6
+    - 7
+  categories:
+    - cloud
+    - system
+    - packaging
+    - development
